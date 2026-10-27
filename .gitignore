@@ -1,0 +1,16 @@
+dist/
+.venv/
+__pycache__/
+*.py[cod]
+
+imports/*
+!imports/__init__.py
+.terraform/
+cdktf.out/
+cdktf.log
+*terraform.*.tfstate*
+
+# Local evidence from an actual deploy/invocation; do not publish deployment state.
+deploy-outputs.json
+invoke-metadata.json
+invoke-response.json

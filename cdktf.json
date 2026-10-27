@@ -1,0 +1,17 @@
+{
+  "language": "python",
+  "app": ".venv/bin/python ./main.py",
+  "projectId": "cdktn-python-lambda-hello-pre65",
+  "sendCrashReports": "false",
+  "sendUsageTelemetry": "true",
+  "targetVersions": {
+    "opentofu": ">=1.12.6"
+  },
+  "terraformProviders": [],
+  "terraformModules": [],
+  "codeMakerOutput": "imports",
+  "context": {
+    "failOnConstructsOutsideOfStacks": "true",
+    "canonicalAssetHashes": "true"
+  }
+}
