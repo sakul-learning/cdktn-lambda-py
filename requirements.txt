@@ -1,2 +1,3 @@
-cdktn~=0.25.0.dev65
+cdktn==0.25.0
+cdktn-provider-aws==26.0.0
 pytest

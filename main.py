@@ -3,34 +3,18 @@ import json
 import os
 
 from constructs import Construct
-from cdktn import (
-    App,
-    AssetType,
-    Fn,
-    TerraformAsset,
-    TerraformOutput,
-    TerraformProvider,
-    TerraformProviderGeneratorMetadata,
-    TerraformResource,
-    TerraformStack,
-    TerraformVariable,
-)
+from cdktn import App, AssetType, Fn, TerraformAsset, TerraformOutput, TerraformStack, TerraformVariable
+from cdktn_provider_aws.iam_role import IamRole
+from cdktn_provider_aws.iam_role_policy_attachment import IamRolePolicyAttachment
+from cdktn_provider_aws.lambda_function import LambdaFunction, LambdaFunctionEnvironment
+from cdktn_provider_aws.provider import AwsProvider
 
 
 class HelloWorldStack(TerraformStack):
     def __init__(self, scope: Construct, stack_id: str):
         super().__init__(scope, stack_id)
 
-        aws = TerraformProvider(
-            self,
-            "aws",
-            terraform_resource_type="aws",
-            terraform_provider_source="hashicorp/aws",
-            terraform_generator_metadata=TerraformProviderGeneratorMetadata(
-                provider_name="aws", provider_version_constraint="~> 6.0"
-            ),
-        )
-        aws.add_override("region", "us-east-1")
+        aws = AwsProvider(self, "aws", region="us-east-1")
 
         ephemeral_greeting = TerraformVariable(
             self,
@@ -38,7 +22,7 @@ class HelloWorldStack(TerraformStack):
             description="Ephemeral greeting passed through the Lambda environment configuration.",
             type="string",
         )
-        # CDKTN has not yet added an `ephemeral` constructor option; emit the OpenTofu argument directly.
+        # CDKTN does not yet expose `ephemeral` as a TerraformVariable constructor option.
         ephemeral_greeting.add_override("ephemeral", True)
 
         lambda_source = TerraformAsset(
@@ -48,70 +32,56 @@ class HelloWorldStack(TerraformStack):
             type=AssetType.ARCHIVE,
         )
 
-        assume_role_policy = json.dumps(
-            {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Principal": {"Service": "lambda.amazonaws.com"},
-                        "Action": "sts:AssumeRole",
-                    }
-                ],
-            }
-        )
-        role = TerraformResource(
+        role = IamRole(
             self,
             "lambda_execution_role",
-            terraform_resource_type="aws_iam_role",
+            name="cdktn-python-hello-world-role",
+            assume_role_policy=json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {"Service": "lambda.amazonaws.com"},
+                            "Action": "sts:AssumeRole",
+                        }
+                    ],
+                }
+            ),
             provider=aws,
         )
-        role.add_override("name", "cdktn-python-hello-world-role")
-        role.add_override("assume_role_policy", assume_role_policy)
 
-        basic_execution = TerraformResource(
+        basic_execution = IamRolePolicyAttachment(
             self,
             "lambda_basic_execution",
-            terraform_resource_type="aws_iam_role_policy_attachment",
+            role=role.name,
+            policy_arn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
             provider=aws,
-        )
-        basic_execution.add_override("role", role.get_string_attribute("name"))
-        basic_execution.add_override(
-            "policy_arn",
-            "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
         )
 
-        function = TerraformResource(
+        function = LambdaFunction(
             self,
             "hello_world",
-            terraform_resource_type="aws_lambda_function",
-            provider=aws,
-            depends_on=[basic_execution],
-        )
-        function.add_override("function_name", "cdktn-python-hello-world")
-        function.add_override("role", role.get_string_attribute("arn"))
-        function.add_override("runtime", "python3.12")
-        function.add_override("handler", "index.handler")
-        function.add_override("filename", lambda_source.path)
-        function.add_override("source_code_hash", lambda_source.asset_hash)
-        function.add_override(
-            "environment",
-            [
-                {
-                    "variables": {
-                        "STATIC_MESSAGE": "hello world",
-                        "EPHEMERAL_GREETING": Fn.ephemeralasnull(
-                            ephemeral_greeting.value
-                        ),
-                    }
+            function_name="cdktn-python-hello-world",
+            role=role.arn,
+            runtime="python3.12",
+            handler="index.handler",
+            filename=lambda_source.path,
+            source_code_hash=lambda_source.asset_hash,
+            environment=LambdaFunctionEnvironment(
+                variables={
+                    "STATIC_MESSAGE": "hello world",
+                    "EPHEMERAL_GREETING": Fn.ephemeralasnull(ephemeral_greeting.value),
                 }
-            ],
+            ),
+            depends_on=[basic_execution],
+            provider=aws,
         )
 
         TerraformOutput(
             self,
             "lambda_function_name",
-            value=function.get_string_attribute("function_name"),
+            value=function.function_name,
             static_id=True,
         )
         TerraformOutput(

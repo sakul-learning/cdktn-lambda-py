@@ -77,5 +77,6 @@ TERRAFORM_BINARY_NAME=tofu \
 
 ## Notes
 
-- The app emits raw Terraform resources through CDKTN core constructs rather than generated AWS provider bindings.
+- The app consumes the published `cdktn-provider-aws==26.0.0` prebuilt bindings, compatible with CDKTN 0.25. This avoids local provider generation.
+- Prebuilt providers are installed as regular language dependencies and are not listed in `cdktf.json`.
 - Local state, synth output, virtual environments, and deploy/invocation response artifacts are intentionally ignored by Git.
